@@ -1,0 +1,27 @@
+name: "CloudScalerEnv"
+version: "1.0.0"
+description: "An environment where an AI agent acts as an SRE, scaling and restarting microservices to optimize resource utilization and prevent crashes."
+author: "OpenEnv Contributor"
+license: "MIT"
+tags:
+  - "openenv"
+  - "devops"
+  - "sre"
+  - "resource-optimization"
+
+environment:
+  entrypoint: "src.env:CloudScalerEnv"
+  state_model: "src.models:Observation"
+  action_model: "src.models:Action"
+  reward_model: "src.models:Reward"
+
+tasks:
+  - id: "easy-memory-leak"
+    difficulty: "easy"
+    description: "Restart a service before it runs out of memory."
+  - id: "medium-traffic-spike"
+    difficulty: "medium"
+    description: "Scale services up and down to handle CPU load efficiently."
+  - id: "hard-cascading-failure"
+    difficulty: "hard"
+    description: "Manage multiple failing services under a strict resource budget."
