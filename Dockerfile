@@ -1,16 +1,18 @@
 FROM python:3.10-slim
 
+# Set the working directory
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies first (better for caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy environment code
-COPY . /app
+# Copy all project files into the container
+COPY . .
 
-# Expose port for Hugging Face Spaces (if wrapping in a FastAPI/Gradio UI later)
+# Expose port 7860 for Hugging Face Spaces
 EXPOSE 7860
 
-# Run a persistent API service for Hugging Face Spaces.
+# Run the API service using uvicorn
+# This points to the 'app' object inside 'src/app.py'
 CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "7860"]
