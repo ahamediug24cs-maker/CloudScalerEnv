@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cloudscalerenv"
+version = "1.0.0"
+description = "OpenEnv Cloud Resource Auto-Scaler Environment"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Al-Ameen26" }
+]
+dependencies = [
+  "pydantic>=2.0.0",
+  "openai>=1.35.0",
+  "fastapi>=0.116.0",
+  "uvicorn>=0.30.0",
+  "pyyaml>=6.0"
+]
+
+[tool.setuptools]
+packages = ["src"]
