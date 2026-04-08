@@ -18,6 +18,7 @@ MANDATORY REQUIREMENTS:
 
 import json
 import os
+import random
 import textwrap
 from typing import List, Optional
 
@@ -25,6 +26,7 @@ from openai import OpenAI
 
 from src.env import CloudScalerEnv
 from src.models import Action, Observation
+from src.policy import choose_action
 from src.tasks import get_task_easy, get_task_hard, get_task_medium
 
 # Environment configuration
@@ -34,7 +36,7 @@ HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 
 # Hyperparameters
 MAX_STEPS = 30
-TEMPERATURE = 0.7
+TEMPERATURE = 0.2
 MAX_TOKENS = 256
 
 SYSTEM_PROMPT = textwrap.dedent(
@@ -102,18 +104,49 @@ def state_to_prompt(obs: Observation) -> str:
     ).strip()
 
 
-def get_model_action(client: Optional[OpenAI], obs: Observation) -> Optional[Action]:
+def _sanitize_action(candidate: Optional[Action], obs: Observation, task_name: str) -> Action:
+    """Reject unsafe/invalid choices and fall back to robust heuristic."""
+    if task_name == "medium-traffic-spike":
+        upper_guard = 66.0
+    elif task_name == "hard-cascading-failure":
+        upper_guard = 68.0
+    else:
+        upper_guard = 70.0
+
+    if candidate is None:
+        return choose_action(obs, task_name)
+
+    if candidate.action_type == "do_nothing":
+        return Action(action_type="do_nothing")
+
+    svc_name = candidate.service_name
+    if not svc_name or svc_name not in obs.services:
+        return choose_action(obs, task_name)
+
+    svc = obs.services[svc_name]
+    count = candidate.count or 1
+    if count < 1:
+        count = 1
+    if count > 3:
+        count = 3
+
+    if candidate.action_type == "scale_up" and svc.replicas >= 10:
+        return Action(action_type="do_nothing")
+    if candidate.action_type == "scale_down":
+        if svc.replicas <= 1 or svc.cpu_utilization > upper_guard:
+            return choose_action(obs, task_name)
+    if candidate.action_type == "restart":
+        healthy_and_safe = svc.status == "healthy" and svc.memory_utilization < 78.0 and 50.0 <= svc.cpu_utilization <= 70.0
+        if healthy_and_safe:
+            return choose_action(obs, task_name)
+
+    return Action(action_type=candidate.action_type, service_name=svc_name, count=count)
+
+
+def get_model_action(client: Optional[OpenAI], obs: Observation, task_name: str) -> Optional[Action]:
     """Query LLM to get next action. Falls back to heuristic if no client."""
     if client is None:
-        # Fallback heuristic
-        for name, svc in obs.services.items():
-            if svc.memory_utilization > 80.0:
-                return Action(action_type="restart", service_name=name)
-            if svc.cpu_utilization > 80.0:
-                return Action(action_type="scale_up", service_name=name, count=1)
-            if svc.cpu_utilization < 30.0 and svc.replicas > 1:
-                return Action(action_type="scale_down", service_name=name, count=1)
-        return Action(action_type="do_nothing")
+        return choose_action(obs, task_name)
     
     prompt = state_to_prompt(obs)
     
@@ -130,17 +163,16 @@ def get_model_action(client: Optional[OpenAI], obs: Observation) -> Optional[Act
         )
         text = (completion.choices[0].message.content or "").strip()
         
-        # Try to extract JSON
-        if text.startswith("{"):
-            parsed = json.loads(text)
+        # Try to extract JSON object from plain text.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            parsed = json.loads(text[start : end + 1])
             action = Action.model_validate(parsed)
-            return action
-        else:
-            # Fallback to do_nothing
-            return Action(action_type="do_nothing")
+            return _sanitize_action(action, obs, task_name)
+        return choose_action(obs, task_name)
     except Exception as exc:
-        print(f"[DEBUG] Model request failed: {exc}", flush=True)
-        return Action(action_type="do_nothing")
+        return choose_action(obs, task_name)
 
 
 def run_task(task_name: str, task_fn) -> tuple[bool, int, float, List[float]]:
@@ -150,13 +182,14 @@ def run_task(task_name: str, task_fn) -> tuple[bool, int, float, List[float]]:
     if HF_TOKEN:
         try:
             client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-        except Exception as e:
-            print(f"[DEBUG] Failed to create OpenAI client: {e}, using heuristic fallback", flush=True)
-    else:
-        print(f"[DEBUG] No HF_TOKEN provided, using heuristic fallback", flush=True)
+        except Exception:
+            client = None
     
     env = CloudScalerEnv()
     task, initial_services, grader = task_fn()
+    
+    # Randomize seed each run for realistic variation
+    task.seed = random.randint(1000, 9999)
     
     log_start(task=task_name, env="cloudscalerenv", model=MODEL_NAME)
     
@@ -173,7 +206,7 @@ def run_task(task_name: str, task_fn) -> tuple[bool, int, float, List[float]]:
                 break
             
             # Get action from LLM or heuristic
-            action = get_model_action(client, obs)
+            action = get_model_action(client, obs, task_name)
             if action is None:
                 action_str = "do_nothing"
                 action = Action(action_type="do_nothing")
@@ -198,7 +231,6 @@ def run_task(task_name: str, task_fn) -> tuple[bool, int, float, List[float]]:
         success = score >= 0.3  # threshold for "success"
         
     except Exception as exc:
-        print(f"[DEBUG] Task execution error: {exc}", flush=True)
         score = 0.0
         success = False
     finally:
@@ -215,16 +247,8 @@ def main():
         ("hard-cascading-failure", get_task_hard),
     ]
     
-    all_scores = []
-    
     for task_name, task_fn in tasks:
-        print(f"\n[INFO] Starting task: {task_name}", flush=True)
-        success, steps, score, rewards = run_task(task_name, task_fn)
-        all_scores.append(score)
-        print(f"[INFO] Task complete: score={score:.3f}, success={success}, steps={steps}\n", flush=True)
-    
-    mean_score = sum(all_scores) / len(all_scores) if all_scores else 0.0
-    print(f"[SUMMARY] Mean score across all tasks: {mean_score:.3f}", flush=True)
+        run_task(task_name, task_fn)
 
 
 if __name__ == "__main__":

@@ -26,6 +26,8 @@ REQUIRED_ROOT_FILES = [
     "openenv.yaml",
     "requirements.txt",
     "README.md",
+    "pyproject.toml",
+    "uv.lock",
 ]
 
 
@@ -33,6 +35,8 @@ def assert_required_files() -> None:
     missing = [name for name in REQUIRED_ROOT_FILES if not (ROOT / name).exists()]
     if not (ROOT / "src").exists():
         missing.append("src/")
+    if not (ROOT / "server").exists():
+        missing.append("server/")
 
     if missing:
         raise SystemExit("Missing required files: " + ", ".join(missing))
@@ -79,7 +83,10 @@ def main() -> int:
             "openenv.yaml",
             "requirements.txt",
             "README.md",
+            "pyproject.toml",
+            "uv.lock",
             "src/**",
+            "server/**",
         ],
         ignore_patterns=[
             ".venv/**",
