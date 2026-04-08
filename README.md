@@ -243,9 +243,9 @@ Validating episode contract...
   ✓ step() contract valid: obs, reward, done, info
   ✓ state() returned Observation
 Validating tasks and graders...
-  ✓ easy: task loaded, grader score 0.269
-  ✓ medium: task loaded, grader score 0.325
-  ✓ hard: task loaded, grader score 0.261
+  ✓ easy: task loaded, grader score 0.259
+  ✓ medium: task loaded, grader score 0.526
+  ✓ hard: task loaded, grader score 0.461
 ============================================================
 Result: 5/5 checks passed
 ============================================================
