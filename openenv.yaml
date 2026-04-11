@@ -20,8 +20,8 @@ tasks:
     difficulty: "easy"
     description: "Restart a service before it runs out of memory."
     task_loader: "src.tasks:get_task_easy"
-    grader: "src.graders:grade_easy"
-    grader_entrypoint: "src.graders:grade_easy"
+    grader: "grader:grade_easy"
+    grader_entrypoint: "grader:grade_easy"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
@@ -29,8 +29,8 @@ tasks:
     difficulty: "medium"
     description: "Scale services up and down to handle CPU load efficiently."
     task_loader: "src.tasks:get_task_medium"
-    grader: "src.graders:grade_medium"
-    grader_entrypoint: "src.graders:grade_medium"
+    grader: "grader:grade_medium"
+    grader_entrypoint: "grader:grade_medium"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
@@ -38,8 +38,8 @@ tasks:
     difficulty: "hard"
     description: "Manage multiple failing services under a strict resource budget."
     task_loader: "src.tasks:get_task_hard"
-    grader: "src.graders:grade_hard"
-    grader_entrypoint: "src.graders:grade_hard"
+    grader: "grader:grade_hard"
+    grader_entrypoint: "grader:grade_hard"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
