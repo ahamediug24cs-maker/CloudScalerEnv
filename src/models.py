@@ -58,3 +58,5 @@ class TaskSpec(BaseModel):
     objective: str
     max_steps: int = Field(ge=5, le=100)
     seed: int = 0
+    grader: Optional[str] = None
+    grader_entrypoint: Optional[str] = None

@@ -22,10 +22,10 @@ tasks:
     task_loader: "src.tasks:get_task_easy"
     task_fn: "src.tasks:get_task_easy"
     task_entrypoint: "src.tasks:get_task_easy"
-    grader: "grader:grade_easy"
-    grader_entrypoint: "grader:grade_easy"
-    grader_fn: "grader:grade_easy"
-    grader_file: "grader.py"
+    grader: "src.tasks:grade_easy"
+    grader_entrypoint: "src.tasks:grade_easy"
+    grader_fn: "src.tasks:grade_easy"
+    grader_file: "src/tasks.py"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
@@ -37,10 +37,10 @@ tasks:
     task_loader: "src.tasks:get_task_medium"
     task_fn: "src.tasks:get_task_medium"
     task_entrypoint: "src.tasks:get_task_medium"
-    grader: "grader:grade_medium"
-    grader_entrypoint: "grader:grade_medium"
-    grader_fn: "grader:grade_medium"
-    grader_file: "grader.py"
+    grader: "src.tasks:grade_medium"
+    grader_entrypoint: "src.tasks:grade_medium"
+    grader_fn: "src.tasks:grade_medium"
+    grader_file: "src/tasks.py"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
@@ -52,10 +52,10 @@ tasks:
     task_loader: "src.tasks:get_task_hard"
     task_fn: "src.tasks:get_task_hard"
     task_entrypoint: "src.tasks:get_task_hard"
-    grader: "grader:grade_hard"
-    grader_entrypoint: "grader:grade_hard"
-    grader_fn: "grader:grade_hard"
-    grader_file: "grader.py"
+    grader: "src.tasks:grade_hard"
+    grader_entrypoint: "src.tasks:grade_hard"
+    grader_fn: "src.tasks:grade_hard"
+    grader_file: "src/tasks.py"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
@@ -64,11 +64,11 @@ tasks:
 
 graders:
   easy-memory-leak:
-    entrypoint: "grader:grade_easy"
+    entrypoint: "src.tasks:grade_easy"
     task_loader: "src.tasks:get_task_easy"
   medium-traffic-spike:
-    entrypoint: "grader:grade_medium"
+    entrypoint: "src.tasks:grade_medium"
     task_loader: "src.tasks:get_task_medium"
   hard-cascading-failure:
-    entrypoint: "grader:grade_hard"
+    entrypoint: "src.tasks:grade_hard"
     task_loader: "src.tasks:get_task_hard"

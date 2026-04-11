@@ -13,7 +13,9 @@ START_RE = re.compile(r"^\[START\] task=\S+ env=\S+ model=\S+$")
 STEP_RE = re.compile(
     r"^\[STEP\] step=\d+ action=\S+ reward=-?\d+\.\d{2} done=(true|false) error=(null|.*)$"
 )
-END_RE = re.compile(r"^\[END\] success=(true|false) steps=\d+ rewards=(-?\d+\.\d{2})(,-?\d+\.\d{2})*$")
+END_RE = re.compile(
+    r"^\[END\] success=(true|false) steps=\d+ score=-?\d+\.\d{2} rewards=(-?\d+\.\d{2})(,-?\d+\.\d{2})*$"
+)
 
 
 def check_file_contract() -> list[str]:
