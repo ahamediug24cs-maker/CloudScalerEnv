@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from src.env import CloudScalerEnv
 from src.models import Action, Observation, Reward, ServiceState
+from src.policy import choose_action
 from src.tasks import get_task_easy, get_task_medium, get_task_hard
 
 
@@ -193,7 +194,7 @@ def validate_tasks() -> bool:
             done = False
             steps = 0
             while not done and steps < 100:
-                action = Action(action_type="do_nothing")
+                action = choose_action(obs, task.task_id)
                 obs, reward, done, info = env.step(action)
                 steps += 1
             

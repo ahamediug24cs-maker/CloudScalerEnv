@@ -10,7 +10,21 @@ tags:
 
 # CloudScalerEnv (OpenEnv)
 
-CloudScalerEnv is a production-grade SRE simulation environment where AI agents learn to autonomously manage microservice infrastructure under realistic stress conditions. The environment models the critical decision-making workflows that SRE teams perform daily: scaling services to handle traffic spikes, restarting unhealthy services, managing cascading failures, and maintaining tight cost budgets—all while preventing service outages.
+CloudScalerEnv is a production-grade SRE simulation environment where autonomous agents learn to manage microservice infrastructure under realistic stress conditions. The environment models the critical decision-making workflows that SRE teams perform daily: scaling services to handle traffic spikes, restarting unhealthy services, managing cascading failures, and maintaining tight cost budgets while preventing service outages.
+
+## Quickstart Client
+
+Run one end-to-end client flow in under a minute:
+
+```bash
+python examples/manual_episode.py
+```
+
+Async variant:
+
+```bash
+python examples/async_client_episode.py
+```
 
 ## Motivation: Why This Matters
 
@@ -20,7 +34,7 @@ Modern cloud-native systems require 24/7 SRE oversight. Production SRE teams spe
 - **Balancing competing constraints**: reliability (prevent outages), cost (minimize resource spend), and performance (maintain SLAs)
 - **Making decisions under incomplete information** (metrics are noisy, dependencies are complex)
 
-CloudScalerEnv distills this complexity into a testable benchmark. It challenges AI agents to:
+CloudScalerEnv distills this complexity into a testable benchmark. It challenges agents to:
 1. **Anticipate failures** before they happen (memory leaks, CPU saturation)
 2. **Coordinate multi-service actions** (respecting service dependencies)
 3. **Optimize under constraints** (operate within budget, meet SLA targets)
@@ -46,6 +60,25 @@ Typed models:
 
 Metadata file:
 - [openenv.yaml](openenv.yaml)
+
+## Client and Server
+
+CloudScalerEnv supports both direct server usage and lightweight client SDK usage.
+
+- Server API: [src/app.py](src/app.py)
+- Sync/async client wrapper: [src/client.py](src/client.py)
+
+Minimal sync client flow:
+
+```python
+from src.client import CloudScalerClient
+
+client = CloudScalerClient(base_url="http://127.0.0.1:7860")
+obs = client.reset(task_id="easy-memory-leak", seed=11)
+result = client.step({"action_type": "do_nothing"})
+state = client.state()
+client.close()
+```
 
 ## Action Space
 
@@ -129,7 +162,7 @@ Max score: **~0.92** with perfect crash prevention and minimal unnecessary resta
 **Service Dependencies**: If auth-api crashes → payment-api degrades (loses requests). Highlights need for coordinated scaling.
 
 **Why Hard for Agents**: Multi-service coordination, SLA-aware decision-making, cost-benefit tradeoffs.
-Observed heuristic baseline: **~0.52** with the current policy and grader calibration.
+Current calibrated baseline for this task is listed in the Baseline Scores section.
 
 ---
 
@@ -153,7 +186,7 @@ Observed heuristic baseline: **~0.52** with the current policy and grader calibr
 - If db-proxy crashes → backend degrades → frontend degrades
 
 **Why Hard for Agents**: Requires understanding of dependency graph, preventive action, multi-step planning under constraints.
-Observed heuristic baseline: **~0.58** with the current policy and grader calibration.
+Current calibrated baseline for this task is listed in the Baseline Scores section.
 
 
 ## Setup
@@ -205,15 +238,281 @@ set OPENAI_API_KEY=your_key_here
 python -m src.baseline --mode openai --model gpt-4.1-mini
 ```
 
+## Reset Scenario Configuration
+
+The reset endpoint accepts runtime overrides so task/scenario setup does not require code edits.
+
+Request payload fields:
+- `task_id`: `easy-memory-leak`, `medium-traffic-spike`, or `hard-cascading-failure`
+- `seed`: override task seed
+- `max_steps`: override horizon (must be 5 to 100)
+- `services`: optional full service map override
+
+Example:
+
+```json
+{
+  "task_id": "medium-traffic-spike",
+  "seed": 99,
+  "max_steps": 30,
+  "services": {
+    "auth-api": {
+      "replicas": 2,
+      "cpu_utilization": 75.0,
+      "memory_utilization": 45.0,
+      "status": "healthy"
+    }
+  }
+}
+```
+
+Behavior:
+- Missing services stay at task defaults
+- Provided services replace/add entries by service name
+- Task dependency logic remains task-specific
+
+### Configuration Matrix
+
+| Field | Type | Default | Valid Range/Values | Impact |
+|---|---|---|---|---|
+| `task_id` | string | `easy-memory-leak` | `easy-memory-leak`, `medium-traffic-spike`, `hard-cascading-failure` | Selects scenario topology, initial state, dependencies, and grader |
+| `seed` | integer | task seed (`11`, `22`, `33`) | any integer | Controls stochastic trajectory realization |
+| `max_steps` | integer | task default (`20`, `24`, `30`) | `5..100` | Changes episode horizon and budget pressure |
+| `services` | object | task initial services | valid `ServiceState` schema per service | Overrides initial replicas/CPU/memory/status per service |
+| `services.<name>.replicas` | integer | task default | `1..10` | Capacity and budget usage |
+| `services.<name>.cpu_utilization` | float | task default | `0..100` | Immediate SLA pressure and scaling decisions |
+| `services.<name>.memory_utilization` | float | task default | `0..100` | Crash risk and restart urgency |
+| `services.<name>.status` | string | `healthy` | `healthy`, `degraded`, `crashed` | Starts service in healthy/degraded/crashed mode |
+
+## Submission Contract
+
+This repository is configured to satisfy the evaluator contract.
+
+- Root inference script: `inference.py`
+- LLM SDK: `OpenAI` client (`from openai import OpenAI`)
+- Required environment variables:
+  - `API_BASE_URL` with default value
+  - `MODEL_NAME` with default value
+  - `HF_TOKEN` required (no default)
+- Output line format emitted by `inference.py`:
+  - `[START] task=<task_name> env=<benchmark> model=<model_name>`
+  - `[STEP] step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>`
+  - `[END] success=<true|false> steps=<n> rewards=<r1,r2,...,rn>`
+- Numeric formatting:
+  - `reward` is formatted to two decimals
+  - `rewards` list values are formatted to two decimals
+
+Quick local contract check:
+
+```bash
+python pre_submit_check.py
+```
+
+This check validates:
+- Inference output format compliance
+- Environment variable contract
+- API smoke test for `/health`, `/reset`, `/step`, and `/state`
+
+## Guideline Compliance Matrix
+
+| Guideline Item | Requirement | Implementation Evidence |
+|---|---|---|
+| Project structure | `inference.py` at repo root | [inference.py](inference.py) |
+| LLM usage | Use OpenAI client for LLM calls | [inference.py](inference.py) imports and uses `OpenAI` |
+| Env vars | `API_BASE_URL` default, `MODEL_NAME` default, `HF_TOKEN` required | [inference.py](inference.py) env var definitions and validation |
+| Output format | Emit `[START]`, `[STEP]`, `[END]` with exact fields and formatting | [inference.py](inference.py) logging helpers and episode flow |
+| End-line guarantee | `[END]` emitted even on exceptions | [inference.py](inference.py) `finally` block |
+| API viability | Environment responds on required endpoints | [src/app.py](src/app.py), [pre_submit_check.py](pre_submit_check.py) |
+| OpenEnv contract | Typed models and reset/step/state lifecycle | [src/models.py](src/models.py), [src/env.py](src/env.py), [validate_local.py](validate_local.py) |
+| Runtime sanity | Lightweight runtime suitable for constrained hardware | [requirements.txt](requirements.txt), [Dockerfile](Dockerfile) |
+| Local verification | One-command pre-submit checks | [pre_submit_check.py](pre_submit_check.py) |
+
+## Evaluation Protocol
+
+CloudScalerEnv uses dense per-step reward and deterministic final grading.
+
+What is optimized:
+- reliability (crash avoidance)
+- SLA compliance (50-70% CPU operating band)
+- uptime
+- budget and action-cost efficiency
+- operational stability
+
+Anti-exploit properties:
+- invalid actions are penalized
+- excessive scaling/restarts increase cost and reduce score components
+- no single metric can dominate without tradeoffs in other metrics
+
+Determinism guarantees:
+- grader is deterministic for the realized final state
+- trajectory dynamics are stochastic through task seeds and environment noise
+- seed sweep support demonstrates non-constant scoring behavior
+
+## Benchmark Score Policy
+
+The benchmark uses a two-layer score policy so training and evaluation are both meaningful:
+
+| Layer | Used For | Signal Type | Determinism | Notes |
+|---|---|---|---|---|
+| Per-step reward (`Reward.value`) | Learning/optimization loop | Dense process signal | Deterministic from current state/action transition | Encourages safe and efficient decisions at each step |
+| Final task grader (`TaskGrader.grade`) | Benchmark comparison/ranking | Terminal evaluation signal | Deterministic from final state | Multi-factor score across reliability, SLA, budget, cost, and stability |
+
+Rubric flow:
+
+```text
+trajectory actions -> per-step dense rewards (train signal)
+final env state    -> deterministic multi-factor grade (eval score)
+```
+
+## Execution Modes
+
+CloudScalerEnv supports two practical execution modes:
+
+- API server mode
+  - run FastAPI service and interact over `/reset`, `/step`, `/state`
+  - best for deployment and evaluator parity
+- Local module mode
+  - run local scripts against `src.env.CloudScalerEnv`
+  - best for development and rapid iteration
+
+### Resource Behavior Under 2 vCPU and 8 GB RAM
+
+The project is intentionally lightweight:
+- CPU-only runtime
+- small dependency footprint
+- short inference prompt and bounded token usage
+
+Operational guidance:
+- keep only one active Hugging Face Space during submission
+- avoid heavy background processes in container startup
+- use `python pre_submit_check.py` before each submission to catch regressions
+
+## Examples
+
+Runnable examples are included in [examples](examples):
+
+- [examples/manual_episode.py](examples/manual_episode.py)
+  - step-by-step manual control episode through API client
+- [examples/heuristic_episode.py](examples/heuristic_episode.py)
+  - end-to-end heuristic run with printed trajectory summary
+- [examples/inference_contract_check.py](examples/inference_contract_check.py)
+  - runs pre-submit inference/API contract checks
+- [examples/async_client_episode.py](examples/async_client_episode.py)
+  - async client usage with automatic local server lifecycle
+
+Run examples:
+
+```bash
+python examples/manual_episode.py
+python examples/heuristic_episode.py
+python examples/inference_contract_check.py
+python examples/async_client_episode.py
+```
+
+Competition dry-run summary in one command:
+
+```bash
+python competition_dry_run.py
+```
+
+## Testing
+
+Install test dependencies:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Run tests:
+
+```bash
+pytest -q
+```
+
+Included tests cover:
+- reset overrides behavior
+- inference output contract shape
+- deterministic grading for identical seeds and trajectories
+- API edge cases (invalid action type, missing fields, unknown task, step/state before reset)
+
+Run concurrent stress testing:
+
+```bash
+python stress_test.py --task medium-traffic-spike --concurrency 20 --requests-per-worker 20 --output stress_report.json
+```
+
+This command validates concurrent `/reset`, `/step`, and `/state` request groups and writes a machine-readable report to `stress_report.json`.
+
+## Submission Runbook
+
+1. Stop all non-primary Hugging Face Spaces.
+2. Ensure primary Space build is complete and status is `Running`.
+3. Run local checks:
+  - `python pre_submit_check.py`
+  - `python validate_local.py`
+  - `python competition_dry_run.py`
+4. Push final code and re-check Space `/health` and `/reset`.
+5. Submit only after live endpoint check succeeds.
+6. If validation fails, fix and resubmit (no penalty).
+
 ## Baseline Scores
 
 Deterministic heuristic baseline (current implementation):
-- Easy: 0.725
-- Medium: 0.516
-- Hard: 0.584
-- Mean: 0.608
+- Easy: 0.9588
+- Medium: 0.8025
+- Hard: 0.8699
+- Mean: 0.8770
 
 OpenAI baseline is reproducible with fixed task seeds and temperature 0.
+
+## Performance Guarantees
+
+The service is designed to stay lightweight and reliable under the competition constraints.
+
+Recent local stress test (`python stress_test.py --task medium-traffic-spike --concurrency 20 --requests-per-worker 20`):
+
+- request groups: 400
+- success rate: 100.0%
+- duration: 4.282s
+- throughput: 93.42 request-groups/sec
+- latency p50: 161.79ms
+- latency p95: 517.08ms
+- latency p99: 694.98ms
+
+Request-group definition:
+- one `POST /reset`
+- one `POST /step`
+- one `GET /state`
+
+Operational guarantees:
+- deterministic grading for identical realized trajectories
+- graceful handling of malformed action payloads via schema validation (422)
+- explicit client-side usage errors for `step/state` before `reset` (400)
+- inference path fails fast on unreachable model endpoints (short timeout + no retries)
+
+## Competition FAQ
+
+Q: Why do scores change across tasks and seeds?
+A: Environment transitions are seeded stochastic processes. Different seeds produce different trajectories. For a fixed seed and identical action trajectory, the grader is deterministic.
+
+Q: Why are scores not always near 1.0?
+A: The benchmark intentionally enforces trade-offs among reliability, SLA compliance, and cost. Perfect uptime with overspending or unstable actions is penalized.
+
+Q: How is this protected from reward hacking?
+A: The reward and final grader both penalize invalid actions, excessive action cost, and poor SLA adherence. No single metric can dominate score quality.
+
+Q: What if a model endpoint is unavailable at runtime?
+A: Inference uses bounded timeout and zero retries for fast failure and then safely falls back to deterministic local policy behavior.
+
+Q: How can reviewers quickly verify submission health?
+A: Run:
+`python pre_submit_check.py`
+`python validate_local.py`
+`python -m pytest -q`
+`python competition_dry_run.py`
+
+Q: How do I verify concurrent reliability?
+A: Run `python stress_test.py --task medium-traffic-spike --concurrency 20 --requests-per-worker 20` and inspect `stress_report.json`.
 
 ## Validation Results
 
@@ -243,9 +542,9 @@ Validating episode contract...
   ✓ step() contract valid: obs, reward, done, info
   ✓ state() returned Observation
 Validating tasks and graders...
-  ✓ easy: task loaded, grader score 0.259
-  ✓ medium: task loaded, grader score 0.526
-  ✓ hard: task loaded, grader score 0.461
+  ✓ easy: task loaded, grader score 0.980
+  ✓ medium: task loaded, grader score 0.829
+  ✓ hard: task loaded, grader score 0.867
 ============================================================
 Result: 5/5 checks passed
 ============================================================

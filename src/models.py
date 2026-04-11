@@ -1,6 +1,6 @@
 from typing import Dict, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ServiceState(BaseModel):
@@ -19,13 +19,21 @@ class Observation(BaseModel):
     restart_count: int = 0
     invalid_action_count: int = 0
     avg_cpu_deviation: float = 0.0
+    sla_violations: int = 0  # Count of timesteps where SLA was violated
+    total_cost: float = 0.0  # Cumulative cost (scale_up/restart penalties)
+    uptime_percent: float = 100.0  # Overall service availability
 
 
 class EnvState(Observation):
     task_id: str = "unknown"
     seed: int = 0
     cumulative_reward: float = 0.0
-    _cpu_deviation_sum: float = 0.0
+    service_dependencies: Dict[str, list] = Field(default_factory=dict)  # e.g., {"backend": ["db-proxy"]}
+    action_costs: float = 0.0  # Cumulative cost of scale_up/restart actions
+    cpu_deviation_sum: float = 0.0  # Internal tracking for deviation
+    service_uptime: Dict[str, int] = Field(default_factory=dict)  # Tracks healthy steps per service
+    
+    model_config = ConfigDict(exclude={'cpu_deviation_sum', 'service_uptime'})
 
 
 class Action(BaseModel):

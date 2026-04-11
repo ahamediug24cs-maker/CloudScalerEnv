@@ -1,26 +1,8 @@
-"""
-CloudScalerEnv Inference Script
-=============================
-
-MANDATORY REQUIREMENTS:
-- Environment variables:
-    API_BASE_URL   The API endpoint for the LLM (default: https://router.huggingface.co/v1)
-    MODEL_NAME     The model identifier (default: Qwen/Qwen2.5-72B-Instruct)
-    HF_TOKEN       Your Hugging Face / API key
-    LOCAL_IMAGE_NAME The local Docker image name (optional, for docker-based inference)
-
-- Uses OpenAI Client for all LLM calls
-- Emits three line types to stdout:
-    [START] task=<task_name> env=cloudscalerenv model=<model_name>
-    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
-    [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
-"""
-
 import json
 import os
-import random
+import sys
 import textwrap
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from openai import OpenAI
 
@@ -29,127 +11,85 @@ from src.models import Action, Observation
 from src.policy import choose_action
 from src.tasks import get_task_easy, get_task_hard, get_task_medium
 
-# Environment configuration
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
-# Hyperparameters
-MAX_STEPS = 30
-TEMPERATURE = 0.2
-MAX_TOKENS = 256
+BENCHMARK_NAME = os.getenv("BENCHMARK_NAME", "cloudscalerenv")
+TASK_NAME = os.getenv("TASK_NAME", "easy-memory-leak")
+
+TEMPERATURE = 0.0
+MAX_TOKENS = 220
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
-    You are an SRE agent managing microservice reliability and cost optimization.
-    Given the current state of services (CPU utilization, memory usage, replica counts),
-    decide the best action to maintain stability while controlling costs.
-    
-    Available actions:
-    - scale_up: increase replicas to distribute load
-    - scale_down: decrease replicas to save costs
-    - restart: restart service to clear memory leaks
-    - do_nothing: maintain current state
-    
-    Respond with ONLY a JSON object on a single line, no markdown:
-    {"action_type": "scale_up"|"scale_down"|"restart"|"do_nothing", "service_name": "service-name", "count": 1}
-    
-    For do_nothing, service_name and count are optional.
+    You are an SRE agent for microservices.
+    Choose one action to improve reliability and cost efficiency.
+    Return only one compact JSON object with keys:
+    action_type, service_name, count.
+    action_type must be one of: scale_up, scale_down, restart, do_nothing.
     """
 ).strip()
 
 
-def log_start(task: str, env: str, model: str) -> None:
-    """Emit [START] line."""
-    print(f"[START] task={task} env={env} model={model}", flush=True)
+def _get_task(task_name: str):
+    if task_name == "easy-memory-leak":
+        return get_task_easy()
+    if task_name == "medium-traffic-spike":
+        return get_task_medium()
+    if task_name == "hard-cascading-failure":
+        return get_task_hard()
+    raise ValueError(f"Unsupported TASK_NAME: {task_name}")
 
 
-def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    """Emit [STEP] line."""
-    error_val = error if error else "null"
-    done_val = str(done).lower()
-    print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
-        flush=True,
-    )
-
-
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
-    """Emit [END] line."""
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(
-        f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
-        flush=True,
-    )
-
-
-def state_to_prompt(obs: Observation) -> str:
-    """Convert observation to natural language prompt."""
-    services_desc = []
+def _obs_to_prompt(obs: Observation) -> str:
+    services = []
     for name, svc in obs.services.items():
-        services_desc.append(
-            f"  {name}: {svc.replicas} replicas, CPU {svc.cpu_utilization:.1f}%, Memory {svc.memory_utilization:.1f}%, Status: {svc.status}"
+        services.append(
+            {
+                "name": name,
+                "replicas": svc.replicas,
+                "cpu": round(svc.cpu_utilization, 2),
+                "memory": round(svc.memory_utilization, 2),
+                "status": svc.status,
+            }
         )
-    
-    return textwrap.dedent(
-        f"""
-        Step {obs.step_count}/{obs.max_steps}
-        Services:
-        {chr(10).join(services_desc)}
-        Budget used: {obs.total_budget_used:.0f} replica-steps
-        Crashes so far: {obs.crash_count}
-        
-        What action should we take?
-        """
-    ).strip()
+
+    payload = {
+        "step": obs.step_count,
+        "max_steps": obs.max_steps,
+        "services": services,
+        "total_budget_used": round(obs.total_budget_used, 2),
+        "crash_count": obs.crash_count,
+        "restart_count": obs.restart_count,
+        "invalid_action_count": obs.invalid_action_count,
+    }
+    return json.dumps(payload, separators=(",", ":"))
 
 
 def _sanitize_action(candidate: Optional[Action], obs: Observation, task_name: str) -> Action:
-    """Reject unsafe/invalid choices and fall back to robust heuristic."""
-    if task_name == "medium-traffic-spike":
-        upper_guard = 66.0
-    elif task_name == "hard-cascading-failure":
-        upper_guard = 68.0
-    else:
-        upper_guard = 70.0
-
     if candidate is None:
         return choose_action(obs, task_name)
 
     if candidate.action_type == "do_nothing":
         return Action(action_type="do_nothing")
 
-    svc_name = candidate.service_name
-    if not svc_name or svc_name not in obs.services:
+    service_name = candidate.service_name
+    if not service_name or service_name not in obs.services:
         return choose_action(obs, task_name)
 
-    svc = obs.services[svc_name]
     count = candidate.count or 1
     if count < 1:
         count = 1
     if count > 3:
         count = 3
 
-    if candidate.action_type == "scale_up" and svc.replicas >= 10:
-        return Action(action_type="do_nothing")
-    if candidate.action_type == "scale_down":
-        if svc.replicas <= 1 or svc.cpu_utilization > upper_guard:
-            return choose_action(obs, task_name)
-    if candidate.action_type == "restart":
-        healthy_and_safe = svc.status == "healthy" and svc.memory_utilization < 78.0 and 50.0 <= svc.cpu_utilization <= 70.0
-        if healthy_and_safe:
-            return choose_action(obs, task_name)
-
-    return Action(action_type=candidate.action_type, service_name=svc_name, count=count)
+    return Action(action_type=candidate.action_type, service_name=service_name, count=count)
 
 
-def get_model_action(client: Optional[OpenAI], obs: Observation, task_name: str) -> Optional[Action]:
-    """Query LLM to get next action. Falls back to heuristic if no client."""
-    if client is None:
-        return choose_action(obs, task_name)
-    
-    prompt = state_to_prompt(obs)
-    
+def _model_action(client: OpenAI, obs: Observation, task_name: str) -> Action:
+    prompt = _obs_to_prompt(obs)
+
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
@@ -159,96 +99,102 @@ def get_model_action(client: Optional[OpenAI], obs: Observation, task_name: str)
             ],
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
-            stream=False,
         )
         text = (completion.choices[0].message.content or "").strip()
-        
-        # Try to extract JSON object from plain text.
         start = text.find("{")
         end = text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            parsed = json.loads(text[start : end + 1])
-            action = Action.model_validate(parsed)
-            return _sanitize_action(action, obs, task_name)
-        return choose_action(obs, task_name)
-    except Exception as exc:
+        if start == -1 or end == -1 or end <= start:
+            return choose_action(obs, task_name)
+
+        parsed = json.loads(text[start : end + 1])
+        action = Action.model_validate(parsed)
+        return _sanitize_action(action, obs, task_name)
+    except Exception:
         return choose_action(obs, task_name)
 
 
-def run_task(task_name: str, task_fn) -> tuple[bool, int, float, List[float]]:
-    """Run a single task and return (success, steps, score, rewards)."""
-    # Create client only if API key is available
-    client = None
-    if HF_TOKEN:
-        try:
-            client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-        except Exception:
-            client = None
-    
-    env = CloudScalerEnv()
-    task, initial_services, grader = task_fn()
-    
-    # Randomize seed each run for realistic variation
-    task.seed = random.randint(1000, 9999)
-    
-    log_start(task=task_name, env="cloudscalerenv", model=MODEL_NAME)
-    
+def _action_str(action: Action) -> str:
+    if action.action_type == "do_nothing":
+        return "do_nothing"
+    svc = action.service_name if action.service_name else ""
+    cnt = action.count if action.count is not None else 1
+    return f"{action.action_type}({svc},{cnt})"
+
+
+def _log_start(task_name: str) -> None:
+    print(f"[START] task={task_name} env={BENCHMARK_NAME} model={MODEL_NAME}", flush=True)
+
+
+def _log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    err = "null" if error is None else str(error).replace("\n", " ").replace("\r", " ")
+    done_str = "true" if done else "false"
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_str} error={err}",
+        flush=True,
+    )
+
+
+def _log_end(success: bool, steps: int, rewards: List[float]) -> None:
+    success_str = "true" if success else "false"
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
+    print(f"[END] success={success_str} steps={steps} rewards={rewards_str}", flush=True)
+
+
+def run_episode() -> Tuple[bool, int, List[float]]:
     rewards: List[float] = []
-    steps_taken = 0
-    score = 0.0
+    steps = 0
     success = False
-    
+    env: Optional[CloudScalerEnv] = None
+
+    _log_start(TASK_NAME)
+
     try:
+        if HF_TOKEN is None:
+            raise ValueError("HF_TOKEN environment variable is required")
+
+        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN, timeout=5.0, max_retries=0)
+        env = CloudScalerEnv()
+
+        task, initial_services, _grader = _get_task(TASK_NAME)
         obs = env.reset_for_task(task, initial_services)
-        
-        for step in range(1, MAX_STEPS + 1):
-            if obs.step_count >= obs.max_steps:
-                break
-            
-            # Get action from LLM or heuristic
-            action = get_model_action(client, obs, task_name)
-            if action is None:
-                action_str = "do_nothing"
-                action = Action(action_type="do_nothing")
-            else:
-                action_str = f"{action.action_type}(service={action.service_name}, count={action.count})"
-            
-            # Step environment
+
+        done = False
+        while not done:
+            action = _model_action(client, obs, TASK_NAME)
             obs, reward, done, info = env.step(action)
-            
-            reward_value = reward.value if reward else 0.0
+
+            steps += 1
+            reward_value = reward.value if reward is not None else 0.0
             rewards.append(reward_value)
-            steps_taken = step
-            
-            log_step(step=step, action=action_str, reward=reward_value, done=done, error=None)
-            
-            if done:
-                break
-        
-        # Grade final trajectory
-        final_state = env.raw_state()
-        score = grader.grade(final_state)
-        success = score >= 0.3  # threshold for "success"
-        
+
+            raw_error = info.get("last_action_error") if isinstance(info, dict) else None
+            _log_step(
+                step=steps,
+                action=_action_str(action),
+                reward=reward_value,
+                done=done,
+                error=raw_error,
+            )
+
+        success = True
+        return success, steps, rewards
     except Exception as exc:
-        score = 0.0
-        success = False
+        print(f"inference_error: {exc}", file=sys.stderr)
+        return success, steps, rewards
     finally:
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
-    
-    return success, steps_taken, score, rewards
+        if env is not None:
+            close_fn = getattr(env, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except Exception:
+                    pass
+
+        _log_end(success=success, steps=steps, rewards=rewards)
 
 
-def main():
-    """Run inference across all three tasks."""
-    tasks = [
-        ("easy-memory-leak", get_task_easy),
-        ("medium-traffic-spike", get_task_medium),
-        ("hard-cascading-failure", get_task_hard),
-    ]
-    
-    for task_name, task_fn in tasks:
-        run_task(task_name, task_fn)
+def main() -> None:
+    run_episode()
 
 
 if __name__ == "__main__":

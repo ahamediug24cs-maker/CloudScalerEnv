@@ -1,6 +1,6 @@
 name: "CloudScalerEnv"
 version: "1.0.0"
-description: "An environment where an AI agent acts as an SRE, scaling and restarting microservices to optimize resource utilization and prevent crashes."
+description: "An environment where an autonomous agent acts as an SRE, scaling and restarting microservices to optimize resource utilization and prevent crashes."
 author: "OpenEnv Contributor"
 license: "MIT"
 tags:
