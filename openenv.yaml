@@ -17,6 +17,7 @@ environment:
 
 tasks:
   - id: "easy-memory-leak"
+    task_id: "easy-memory-leak"
     difficulty: "easy"
     description: "Restart a service before it runs out of memory."
     task_loader: "src.tasks:get_task_easy"
@@ -25,13 +26,17 @@ tasks:
     grader: "src.tasks:grade_easy"
     grader_entrypoint: "src.tasks:grade_easy"
     grader_fn: "src.tasks:grade_easy"
+    grader_path: "grader.py"
     grader_file: "src/tasks.py"
+    grader_module: "src.tasks"
+    grader_function: "grade_easy"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
     score_min_exclusive: 0.0
     score_max_exclusive: 1.0
   - id: "medium-traffic-spike"
+    task_id: "medium-traffic-spike"
     difficulty: "medium"
     description: "Scale services up and down to handle CPU load efficiently."
     task_loader: "src.tasks:get_task_medium"
@@ -40,13 +45,17 @@ tasks:
     grader: "src.tasks:grade_medium"
     grader_entrypoint: "src.tasks:grade_medium"
     grader_fn: "src.tasks:grade_medium"
+    grader_path: "grader.py"
     grader_file: "src/tasks.py"
+    grader_module: "src.tasks"
+    grader_function: "grade_medium"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
     score_min_exclusive: 0.0
     score_max_exclusive: 1.0
   - id: "hard-cascading-failure"
+    task_id: "hard-cascading-failure"
     difficulty: "hard"
     description: "Manage multiple failing services under a strict resource budget."
     task_loader: "src.tasks:get_task_hard"
@@ -55,7 +64,10 @@ tasks:
     grader: "src.tasks:grade_hard"
     grader_entrypoint: "src.tasks:grade_hard"
     grader_fn: "src.tasks:grade_hard"
+    grader_path: "grader.py"
     grader_file: "src/tasks.py"
+    grader_module: "src.tasks"
+    grader_function: "grade_hard"
     score_range:
       min_exclusive: 0.0
       max_exclusive: 1.0
