@@ -134,16 +134,20 @@ def _log_step(step: int, action: str, reward: float, done: bool, error: Optional
     )
 
 
-def _log_end(success: bool, steps: int, rewards: List[float]) -> None:
+def _log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     success_str = "true" if success else "false"
     rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
-    print(f"[END] success={success_str} steps={steps} rewards={rewards_str}", flush=True)
+    print(
+        f"[END] success={success_str} steps={steps} score={score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
 
 
 def run_episode() -> Tuple[bool, int, List[float]]:
     rewards: List[float] = []
     steps = 0
     success = False
+    episode_score = 0.0
     env: Optional[CloudScalerEnv] = None
 
     _log_start(TASK_NAME)
@@ -177,6 +181,8 @@ def run_episode() -> Tuple[bool, int, List[float]]:
             )
 
         success = True
+        if rewards:
+            episode_score = max(0.0, min(1.0, sum(rewards) / len(rewards)))
         return success, steps, rewards
     except Exception as exc:
         print(f"inference_error: {exc}", file=sys.stderr)
@@ -190,7 +196,9 @@ def run_episode() -> Tuple[bool, int, List[float]]:
                 except Exception:
                     pass
 
-        _log_end(success=success, steps=steps, rewards=rewards)
+        if rewards:
+            episode_score = max(0.0, min(1.0, sum(rewards) / len(rewards)))
+        _log_end(success=success, steps=steps, score=episode_score, rewards=rewards)
 
 
 def main() -> None:
