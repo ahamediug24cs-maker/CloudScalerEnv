@@ -1,0 +1,17 @@
+{
+  "task_id": "medium-traffic-spike",
+  "concurrency": 20,
+  "requests_per_worker": 20,
+  "total_requests": 400,
+  "successful_request_groups": 400,
+  "failed_request_groups": 0,
+  "success_rate_percent": 100.0,
+  "duration_sec": 4.754,
+  "throughput_groups_per_sec": 84.15,
+  "latency_ms": {
+    "mean": 223.34,
+    "p50": 181.11,
+    "p95": 507.91,
+    "p99": 743.11
+  }
+}
