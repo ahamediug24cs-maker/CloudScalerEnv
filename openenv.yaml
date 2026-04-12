@@ -22,9 +22,9 @@ tasks:
     description: "Restart a leaking service before crash with minimal overhead."
     task_loader: "src.tasks:get_task_easy"
     task_entrypoint: "src.tasks:get_task_easy"
-    grader: "src.tasks:grade_easy"
-    grader_entrypoint: "src.tasks:grade_easy"
-    grader_fn: "src.tasks:grade_easy"
+    grader: "graders:grade_easy"
+    grader_entrypoint: "graders:grade_easy"
+    grader_fn: "graders:grade_easy"
 
   - id: "medium-traffic-spike"
     task_id: "medium-traffic-spike"
@@ -32,9 +32,9 @@ tasks:
     description: "Handle multi-service CPU spikes while staying near SLA band."
     task_loader: "src.tasks:get_task_medium"
     task_entrypoint: "src.tasks:get_task_medium"
-    grader: "src.tasks:grade_medium"
-    grader_entrypoint: "src.tasks:grade_medium"
-    grader_fn: "src.tasks:grade_medium"
+    grader: "graders:grade_medium"
+    grader_entrypoint: "graders:grade_medium"
+    grader_fn: "graders:grade_medium"
 
   - id: "hard-cascading-failure"
     task_id: "hard-cascading-failure"
@@ -42,17 +42,17 @@ tasks:
     description: "Prevent cascading failures across dependencies under tight budget."
     task_loader: "src.tasks:get_task_hard"
     task_entrypoint: "src.tasks:get_task_hard"
-    grader: "src.tasks:grade_hard"
-    grader_entrypoint: "src.tasks:grade_hard"
-    grader_fn: "src.tasks:grade_hard"
+    grader: "graders:grade_hard"
+    grader_entrypoint: "graders:grade_hard"
+    grader_fn: "graders:grade_hard"
 
 graders:
   easy-memory-leak:
-    entrypoint: "src.tasks:grade_easy"
+    entrypoint: "graders:grade_easy"
     task_loader: "src.tasks:get_task_easy"
   medium-traffic-spike:
-    entrypoint: "src.tasks:grade_medium"
+    entrypoint: "graders:grade_medium"
     task_loader: "src.tasks:get_task_medium"
   hard-cascading-failure:
-    entrypoint: "src.tasks:grade_hard"
+    entrypoint: "graders:grade_hard"
     task_loader: "src.tasks:get_task_hard"
