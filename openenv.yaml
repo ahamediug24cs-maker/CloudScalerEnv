@@ -23,12 +23,12 @@ tasks:
     task_loader: "src.tasks:get_task_easy"
     task_fn: "src.tasks:get_task_easy"
     task_entrypoint: "src.tasks:get_task_easy"
-    grader: "src.tasks:grade_easy"
-    grader_entrypoint: "src.tasks:grade_easy"
-    grader_fn: "src.tasks:grade_easy"
+    grader: "grader:grade_easy"
+    grader_entrypoint: "grader:grade_easy"
+    grader_fn: "grader:grade_easy"
     grader_path: "grader.py"
-    grader_file: "src/tasks.py"
-    grader_module: "src.tasks"
+    grader_file: "grader.py"
+    grader_module: "grader"
     grader_function: "grade_easy"
     score_range:
       min_exclusive: 0.0
@@ -42,12 +42,12 @@ tasks:
     task_loader: "src.tasks:get_task_medium"
     task_fn: "src.tasks:get_task_medium"
     task_entrypoint: "src.tasks:get_task_medium"
-    grader: "src.tasks:grade_medium"
-    grader_entrypoint: "src.tasks:grade_medium"
-    grader_fn: "src.tasks:grade_medium"
+    grader: "grader:grade_medium"
+    grader_entrypoint: "grader:grade_medium"
+    grader_fn: "grader:grade_medium"
     grader_path: "grader.py"
-    grader_file: "src/tasks.py"
-    grader_module: "src.tasks"
+    grader_file: "grader.py"
+    grader_module: "grader"
     grader_function: "grade_medium"
     score_range:
       min_exclusive: 0.0
@@ -61,12 +61,12 @@ tasks:
     task_loader: "src.tasks:get_task_hard"
     task_fn: "src.tasks:get_task_hard"
     task_entrypoint: "src.tasks:get_task_hard"
-    grader: "src.tasks:grade_hard"
-    grader_entrypoint: "src.tasks:grade_hard"
-    grader_fn: "src.tasks:grade_hard"
+    grader: "grader:grade_hard"
+    grader_entrypoint: "grader:grade_hard"
+    grader_fn: "grader:grade_hard"
     grader_path: "grader.py"
-    grader_file: "src/tasks.py"
-    grader_module: "src.tasks"
+    grader_file: "grader.py"
+    grader_module: "grader"
     grader_function: "grade_hard"
     score_range:
       min_exclusive: 0.0
@@ -76,11 +76,11 @@ tasks:
 
 graders:
   easy-memory-leak:
-    entrypoint: "src.tasks:grade_easy"
+    entrypoint: "grader:grade_easy"
     task_loader: "src.tasks:get_task_easy"
   medium-traffic-spike:
-    entrypoint: "src.tasks:grade_medium"
+    entrypoint: "grader:grade_medium"
     task_loader: "src.tasks:get_task_medium"
   hard-cascading-failure:
-    entrypoint: "src.tasks:grade_hard"
+    entrypoint: "grader:grade_hard"
     task_loader: "src.tasks:get_task_hard"
