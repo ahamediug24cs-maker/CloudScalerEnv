@@ -1,4 +1,4 @@
-from typing import Dict, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -28,12 +28,12 @@ class EnvState(Observation):
     task_id: str = "unknown"
     seed: int = 0
     cumulative_reward: float = 0.0
-    service_dependencies: Dict[str, list] = Field(default_factory=dict)  # e.g., {"backend": ["db-proxy"]}
+    service_dependencies: Dict[str, List[str]] = Field(default_factory=dict)
     action_costs: float = 0.0  # Cumulative cost of scale_up/restart actions
     cpu_deviation_sum: float = 0.0  # Internal tracking for deviation
     service_uptime: Dict[str, int] = Field(default_factory=dict)  # Tracks healthy steps per service
     
-    model_config = ConfigDict(exclude={'cpu_deviation_sum', 'service_uptime'})
+    model_config = ConfigDict(exclude={"cpu_deviation_sum", "service_uptime"})
 
 
 class Action(BaseModel):
@@ -60,3 +60,4 @@ class TaskSpec(BaseModel):
     seed: int = 0
     grader: Optional[str] = None
     grader_entrypoint: Optional[str] = None
+    grader_fn: Optional[str] = None

@@ -1,6 +1,6 @@
 name: "CloudScalerEnv"
 version: "1.0.0"
-description: "An environment where an autonomous agent acts as an SRE, scaling and restarting microservices to optimize resource utilization and prevent crashes."
+description: "SRE environment for autoscaling and recovery under budget and SLA constraints."
 author: "OpenEnv Contributor"
 license: "MIT"
 tags:
@@ -19,68 +19,40 @@ tasks:
   - id: "easy-memory-leak"
     task_id: "easy-memory-leak"
     difficulty: "easy"
-    description: "Restart a service before it runs out of memory."
+    description: "Restart a leaking service before crash with minimal overhead."
     task_loader: "src.tasks:get_task_easy"
-    task_fn: "src.tasks:get_task_easy"
     task_entrypoint: "src.tasks:get_task_easy"
-    grader: "grader:grade_easy"
-    grader_entrypoint: "grader:grade_easy"
-    grader_fn: "grader:grade_easy"
-    grader_path: "grader.py"
-    grader_file: "grader.py"
-    grader_module: "grader"
-    grader_function: "grade_easy"
-    score_range:
-      min_exclusive: 0.0
-      max_exclusive: 1.0
-    score_min_exclusive: 0.0
-    score_max_exclusive: 1.0
+    grader: "src.tasks:grade_easy"
+    grader_entrypoint: "src.tasks:grade_easy"
+    grader_fn: "src.tasks:grade_easy"
+
   - id: "medium-traffic-spike"
     task_id: "medium-traffic-spike"
     difficulty: "medium"
-    description: "Scale services up and down to handle CPU load efficiently."
+    description: "Handle multi-service CPU spikes while staying near SLA band."
     task_loader: "src.tasks:get_task_medium"
-    task_fn: "src.tasks:get_task_medium"
     task_entrypoint: "src.tasks:get_task_medium"
-    grader: "grader:grade_medium"
-    grader_entrypoint: "grader:grade_medium"
-    grader_fn: "grader:grade_medium"
-    grader_path: "grader.py"
-    grader_file: "grader.py"
-    grader_module: "grader"
-    grader_function: "grade_medium"
-    score_range:
-      min_exclusive: 0.0
-      max_exclusive: 1.0
-    score_min_exclusive: 0.0
-    score_max_exclusive: 1.0
+    grader: "src.tasks:grade_medium"
+    grader_entrypoint: "src.tasks:grade_medium"
+    grader_fn: "src.tasks:grade_medium"
+
   - id: "hard-cascading-failure"
     task_id: "hard-cascading-failure"
     difficulty: "hard"
-    description: "Manage multiple failing services under a strict resource budget."
+    description: "Prevent cascading failures across dependencies under tight budget."
     task_loader: "src.tasks:get_task_hard"
-    task_fn: "src.tasks:get_task_hard"
     task_entrypoint: "src.tasks:get_task_hard"
-    grader: "grader:grade_hard"
-    grader_entrypoint: "grader:grade_hard"
-    grader_fn: "grader:grade_hard"
-    grader_path: "grader.py"
-    grader_file: "grader.py"
-    grader_module: "grader"
-    grader_function: "grade_hard"
-    score_range:
-      min_exclusive: 0.0
-      max_exclusive: 1.0
-    score_min_exclusive: 0.0
-    score_max_exclusive: 1.0
+    grader: "src.tasks:grade_hard"
+    grader_entrypoint: "src.tasks:grade_hard"
+    grader_fn: "src.tasks:grade_hard"
 
 graders:
   easy-memory-leak:
-    entrypoint: "grader:grade_easy"
+    entrypoint: "src.tasks:grade_easy"
     task_loader: "src.tasks:get_task_easy"
   medium-traffic-spike:
-    entrypoint: "grader:grade_medium"
+    entrypoint: "src.tasks:grade_medium"
     task_loader: "src.tasks:get_task_medium"
   hard-cascading-failure:
-    entrypoint: "grader:grade_hard"
+    entrypoint: "src.tasks:grade_hard"
     task_loader: "src.tasks:get_task_hard"
